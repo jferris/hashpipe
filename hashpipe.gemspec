@@ -25,5 +25,4 @@ Gem::Specification.new do |s|
   ]
   s.add_dependency("wycats-moneta", ["> 0.0.0"])
   s.add_dependency("activesupport", ["> 0.0.0"])
-  s.add_dependency("assaf-uuid", ["> 0.0.0"])
 end

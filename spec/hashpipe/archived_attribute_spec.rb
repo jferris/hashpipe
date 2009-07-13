@@ -2,7 +2,7 @@ require File.join(File.dirname(__FILE__), %w[ .. spec_helper ])
 
 describe HashPipe::ArchivedAttribute do
   before do
-    stub_model = stub(:uuid => '43')
+    stub_model = stub
     @aa = HashPipe::ArchivedAttribute.new(:glorp, stub_model)
     HashPipe::MonetaBackend.any_instance.stubs(:table_name_from).returns('foo_table')
   end

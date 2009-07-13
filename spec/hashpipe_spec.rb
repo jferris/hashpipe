@@ -10,7 +10,6 @@ ActiveRecord::Migration.verbose = false
 ActiveRecord::Base.silence do
   ActiveRecord::Schema.define do
     create_table :stories do |table|
-      table.string :uuid
       table.string :title
       table.string :content_key
       table.string :description_key
@@ -39,12 +38,6 @@ describe HashPipe do
 
   it "should load marshalled objects" do
     @bear_story.description.should == @bear_struct
-  end
-
-  it "shouldn't change uuid after it is initially set" do
-    lambda {
-      @bear_story.save!
-    }.should_not change(@bear_story, :uuid)
   end
 
   [:save_archived_attributes, :destroy_archived_attributes].each do |sym|
