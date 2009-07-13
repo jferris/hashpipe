@@ -1,127 +1,170 @@
 require File.join(File.dirname(__FILE__), %w[ .. spec_helper ])
 
-describe HashPipe::ArchivedAttribute do
-  before do
-    stub_model = stub
-    @aa = HashPipe::ArchivedAttribute.new(:glorp, stub_model)
-    HashPipe::MonetaBackend.any_instance.stubs(:table_name_from).returns('foo_table')
+module ArchivedAttributeHelpers
+  def build_attribute(opts = {})
+    opts[:name]    ||= :glorp
+    opts[:backend] ||= Moneta::Memory.new
+    opts[:scope]   ||= 'unique-id'
+    HashPipe::ArchivedAttribute.new(opts.delete(:name),
+                                    opts.delete(:scope),
+                                    opts.delete(:backend),
+                                    opts)
   end
 
-  describe "#dirty?" do
-    it "should return false when a value has not been set" do
-      @aa.should_not be_dirty
-    end
-
-    it "should return when the value has been set" do
-      @aa.value = 'stuff'
-      @aa.should be_dirty
-    end
-    
-    it "should not be dirty after save is called" do
-      @aa.value = 'stuff'
-      @aa.should be_dirty
-      @aa.save
-      @aa.should_not be_dirty      
-    end
+  def clone_attribute(attribute)
+    build_attribute(:marshal  => attribute.marshal?,
+                    :compress => attribute.compress?,
+                    :backend  => attribute.backend,
+                    :scope    => attribute.scope,
+                    :name     => attribute.name)
   end
 
-  describe "#marshal?" do
-    it "should return false if configuration option is nil" do
-      @aa.expects(:options).returns({:marshal => nil})
-      @aa.__send__(:marshal?).should be_false
-    end
-
-    it "should return value from configuration if configuration option is not nil" do
-      @aa.expects(:options).returns({:marshal => false}).times(2)
-      @aa.__send__(:marshal?).should be_false
-    end
-  end
-
-  describe "#compress?" do
-    it "should return false if configuration option is nil" do
-      @aa.expects(:options).returns({:compress => nil})
-      @aa.__send__(:compress?).should be_false
-    end
-
-    it "should return value from configuration if configuration option is not nil" do
-      @aa.expects(:options).returns({:compress => false}).times(2)
-      @aa.__send__(:compress?).should be_false
-    end
-  end
-
-  describe "#destroy" do
-    it "should call destroy on the backend object" do
-      backend = mock('backend', :destroy => true)
-      @aa.instance_variable_set(:'@backend', backend)
-      @aa.destroy
-    end
-  end
-
-  describe "when marshal is on" do
-    before do
-      @content = 'mary had a little lamb'
-      stub_backend = stub('backend', :load => Marshal.dump(@content))
-      @aa.stubs(:options).
-        returns({ :storage => 'filesystem', :marshal => true })
-      @aa.__send__(:instance_variable_set, :'@backend', stub_backend)
-    end
-
-    it "should call Marshal.load to restore value" do
-      Marshal.expects(:load)
-      @aa.value
-    end
-
-    it "should call Marshal.dump to save value" do
-      Marshal.expects(:dump)
-      @aa.value = 'foo'
-    end
-
-    it "should retrieve same content string stored in Marshalled form" do
-      @aa.value.should == @content
-    end
-  end
-
-  describe "when gzip is on" do
-    before do
-      @content = "The band formed in 1988 in Oxford"
-      stub_backend = stub('backend', :load => Zlib::Deflate.deflate(@content))
-      @aa.stubs(:options).
-        returns({ :storage => 'filesystem', :compress => true })
-      @aa.__send__(:instance_variable_set, :'@backend', stub_backend)
-    end
-
-    it "should call Zlib::Inflate.inflate to restore value" do
-      Zlib::Inflate.expects(:inflate)
-      @aa.value
-    end
-
-    it "should call Zlib::Deflate.deflate to save value" do
-      Zlib::Deflate.expects(:deflate)
-      @aa.value = 'foo'
-    end
-
-    it "should retrieve same content string stored in gzip form" do
-      @aa.value.should == @content
-    end
-
-    it "should not raise an error with nil content" do
-      lambda {
-        @aa.value = nil
-      }.should_not raise_error
-    end
-  end
-
-  describe "when compress and marshal are on" do
-    before do
-      @content = "The band formed in 1988 in Oxford"
-      stub_backend = stub('backend', :load => Zlib::Deflate.deflate(Marshal.dump(@content)))
-      @aa.stubs(:options).
-        returns({ :storage => 'filesystem', :compress => true, :marshal => true })
-      @aa.__send__(:instance_variable_set, :'@backend', stub_backend)
-    end
-
-    it "should retrieve the same content given" do
-      @aa.value.should == @content
-    end
+  def backend
+    subject.backend
   end
 end
+
+describe HashPipe::ArchivedAttribute do
+
+  include ArchivedAttributeHelpers
+
+  before { @attribute = build_attribute }
+
+  subject { @attribute }
+
+  it "should not be dirty when a value has not been set" do
+    should_not be_dirty
+  end
+
+  it "should join the scope and the attribute name as a hash key" do
+    subject.key.should == "#{subject.scope}_#{subject.name}"
+  end
+
+  it "should allow the scope to be set" do
+    new_scope = 'another scope'
+    subject.scope = new_scope
+    subject.scope.should == new_scope
+  end
+
+  it "should use the provided backend" do
+    backend = Moneta::Memory.new
+    build_attribute(:backend => backend).backend.should == backend
+  end
+
+  it "should return when the value has been set" do
+    subject.value = 'stuff'
+    should be_dirty
+  end
+
+  it "should not be dirty after save is called" do
+    subject.value = 'stuff'
+    subject.save
+    should_not be_dirty
+  end
+
+  it "should add itself to the backend when saved" do
+    value = 'a value'
+
+    backend.should_not have_key(subject.key)
+
+    subject.value = value
+    subject.save
+
+    backend[subject.key].should == value
+  end
+
+  it "should retrieve itself from the backend" do
+    value = 'a value'
+    backend[subject.key] = value
+
+    subject.value.should == value
+  end
+
+  it "should remove itself from the backend when destroyed" do
+    backend[subject.key] = 'value'
+    subject.destroy
+    backend.should_not have_key(subject.key)
+  end
+
+  it "should correctly store a marshalled, compressed value" do
+    value = 'the value'
+    attribute = build_attribute(:marshal => true, :compress => true)
+    attribute.value = value
+    attribute.save
+
+    clone_attribute(attribute).value.should == value
+  end
+end
+
+
+describe HashPipe::ArchivedAttribute, "when marshal is on" do
+
+  include ArchivedAttributeHelpers
+
+  before { @attribute = build_attribute(:marshal => true) }
+  subject { @attribute }
+
+  it "should be marshalled" do
+    subject.marshal?.should be
+  end
+
+  it "should store a marshalled value" do
+    stored = 'stored value'
+    actual = 'a value'
+
+    Marshal.expects(:dump).with(actual).returns(stored)
+
+    subject.value = actual
+    subject.save
+
+    backend[subject.key].should == stored
+  end
+
+  it "should retrieve a marshalled value" do
+    stored = 'stored value'
+    actual = 'a value'
+    backend[subject.key] = stored
+
+    Marshal.expects(:load).with(stored).returns(actual)
+
+    subject.value.should == actual
+  end
+
+  it "should correctly store a nil value" do
+    subject.value = nil
+    subject.save
+    clone_attribute(subject).value.should be_nil
+  end
+end
+
+describe HashPipe::ArchivedAttribute, "when compression is on" do
+
+  include ArchivedAttributeHelpers
+
+  before { @attribute = build_attribute(:compress => true) }
+  subject { @attribute }
+
+  it "should be compressed" do
+    subject.compress?.should be
+  end
+
+  it "should store a compressed value" do
+    value = 'a value'
+    subject.value = value
+    subject.save
+    backend[subject.key].should == Zlib::Deflate.deflate(value)
+  end
+
+  it "should retrieve a compressed value" do
+    value = 'a value'
+    backend[subject.key] = Zlib::Deflate.deflate(value)
+    subject.value.should == value
+  end
+
+  it "should correctly store a nil value" do
+    subject.value = nil
+    subject.save
+    clone_attribute(subject).value.should be_nil
+  end
+end
+

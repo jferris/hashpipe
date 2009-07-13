@@ -1,4 +1,6 @@
 require 'rubygems'
+require 'moneta'
+require 'moneta/memory'
 require 'ostruct'
 require 'mocha'
 require 'spec'
@@ -9,6 +11,7 @@ Spec::Runner.configure do |config|
   config.mock_with(:mocha)
 end
 
+$: << File.join(File.dirname(__FILE__), '..', 'lib')
 require File.join(File.dirname(__FILE__), %w[.. init])
 
 RAILS_DEFAULT_LOGGER = Logger.new(STDOUT) unless defined?(RAILS_DEFAULT_LOGGER)

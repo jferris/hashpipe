@@ -1,24 +1,23 @@
 require 'activesupport'
 require 'moneta'
 
-require File.expand_path(File.join(File.dirname(__FILE__),  'moneta_backend'))
-
 module HashPipe
-  
-  class ArchivedAttribute
-    attr_reader :name, :instance
 
-    def initialize(name, instance, opts = {})
-      @name     = name
-      @instance = instance
-      @dirty    = false
-      @_options = HashPipe::GlobalConfiguration.instance.to_hash.merge(opts)
-      @backend  = instantiate_backend_from(options)
+  class ArchivedAttribute
+    attr_reader :name, :backend
+    attr_accessor :scope
+
+    def initialize(name, scope, backend, opts = {})
+      @name    = name
+      @scope   = scope
+      @dirty   = false
+      @options = HashPipe::GlobalConfiguration.instance.to_hash.merge(opts)
+      @backend = backend
     end
-    
+
     def value
-      val = defined?(@stashed_value) ? @stashed_value : @backend.load
-      val = compress? ? Zlib::Inflate.inflate(val) : val
+      val = defined?(@stashed_value) ? @stashed_value : backend[key]
+      val = compress? && !val.nil? ? Zlib::Inflate.inflate(val) : val
       val = marshal? ? Marshal.load(val) : val
     end
 
@@ -33,28 +32,22 @@ module HashPipe
       @dirty
     end
 
-    # First saves this record to the back-end.  If backend storage raises an
-    # error, we capture it and add it to the AR validation errors.
     def save
-      @backend.save(@stashed_value) if self.dirty?
+      backend[key] = @stashed_value if self.dirty?
       @dirty = false
     end
 
     def destroy
-      @backend.destroy
-    end
-
-    # Returns a backend object based on the options given (e.g., filesystem,
-    # s3).
-    def instantiate_backend_from(options)
-      HashPipe::MonetaBackend.new(self)
+      backend.delete(key)
     end
 
     def options
-      @_options
+      @options
     end
 
-    private
+    def key
+      [scope, name].join('_')
+    end
 
     [:marshal, :compress].each do |sym|
       define_method("#{sym}?") do                   # def marshal?
@@ -63,5 +56,5 @@ module HashPipe
     end
 
   end
-  
+
 end

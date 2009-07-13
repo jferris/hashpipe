@@ -17,8 +17,6 @@ ActiveRecord::Base.silence do
   end
 end
 
-ActiveRecord::Base.__send__(:include, HashPipe)
-
 class Story < ActiveRecord::Base
   hattr :content
   hattr :description, { :marshalled => true }
@@ -32,12 +30,16 @@ describe HashPipe do
     @bear_story   =  Story.create!(:title => 'bear story', :content => 'Raaaar!', :description => @bear_struct)
   end
 
+  def refind(instance)
+    instance.class.find(instance.id)
+  end
+
   it "should retrieve textual content" do
-    @lamb_story.content.should == @lamb_text
+    refind(@lamb_story).content.should == @lamb_text
   end
 
   it "should load marshalled objects" do
-    @bear_story.description.should == @bear_struct
+    refind(@bear_story).description.should == @bear_struct
   end
 
   [:save_archived_attributes, :destroy_archived_attributes].each do |sym|
