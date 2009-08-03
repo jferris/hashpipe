@@ -1,7 +1,7 @@
 --- !ruby/object:Gem::Specification 
 name: hashpipe
 version: !ruby/object:Gem::Version 
-  version: 0.0.5.0.1247583913
+  version: 0.0.5.0.1249326265
 platform: ruby
 authors: 
 - Justin Leitgeb
@@ -9,11 +9,11 @@ autorequire:
 bindir: bin
 cert_chain: []
 
-date: 2009-07-14 00:00:00 -04:00
+date: 2009-08-03 00:00:00 -04:00
 default_executable: 
 dependencies: 
 - !ruby/object:Gem::Dependency 
-  name: wycats-moneta
+  name: jferris-moneta
   type: :runtime
   version_requirement: 
   version_requirements: !ruby/object:Gem::Requirement 

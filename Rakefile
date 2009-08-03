@@ -35,7 +35,7 @@ gem_spec = Gem::Specification.new do |s|
   s.authors  = ["Justin Leitgeb"]
   s.files    = FileList['[A-Z]*', '{lib,spec}/**/*.rb', 'init.rb', 'config/hashpipe.yml']
   s.test_files = FileList['spec/**/*.rb']
-  s.add_dependency("wycats-moneta", ["> 0.0.0"])
+  s.add_dependency("jferris-moneta", ["> 0.0.0"])
   s.add_dependency("activesupport", ["> 0.0.0"])
 end
 
